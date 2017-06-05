@@ -1,6 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import list_route
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -25,12 +25,22 @@ class LetterViewSet(mixins.CreateModelMixin, mixins.UpdateModelMixin,
 
         return self.serializer_class
 
-    @detail_route(methods=['POST'])
-    def check(self, request, pk=None):
-        instance = self.get_object()
+    @list_route(methods=['POST'])
+    def check(self, request):
         codeword = self.request.data.get('codeword')
 
-        if not instance.check_codeword(codeword):
+        instances = list(
+            filter(
+                lambda obj: obj.check_codeword(codeword),
+                self.get_queryset()
+            )
+        )
+        if len(instances) > 1:  # Main problem of this version
+            raise RuntimeError('Similar codewords. Collision.')
+
+        try:
+            instance = instances[0]
+        except KeyError:
             raise PermissionDenied('Id/codeword not correct')
 
         serializer = self.get_serializer(instance)
